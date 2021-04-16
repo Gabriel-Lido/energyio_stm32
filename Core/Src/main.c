@@ -23,6 +23,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "stdlib.h"
+#include "math.h"
+#include "float.h"
 #include "ADC/adc.h"
 /* USER CODE END Includes */
 
@@ -33,6 +36,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ZERO_OFFSET 1950
+#define ADC_TO_V_STEP 0.2327
+#define SAMPLES_PER_CYCLE 64
+#define ONE_SECOND 60
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,10 +50,13 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+uint32_t actual_tick[512], actual_sample = 0, j = 0;
+float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, teste_v[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -54,6 +64,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -63,8 +74,7 @@ static void MX_ADC1_Init(void);
 int _write(int file, char *ptr, int len)
 {
   /* Implement your write code here, this is used by puts and printf for example */
-
-  HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 100);
+  HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 10);
 
   return len;
 }
@@ -77,7 +87,7 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-uint32_t adc_readed, actual_tick[100], actual_value[100], i = 0;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -100,8 +110,12 @@ uint32_t adc_readed, actual_tick[100], actual_value[100], i = 0;
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+//  HAL_ADCEx_Calibration_Start(&hadc1);
+
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,18 +124,9 @@ uint32_t adc_readed, actual_tick[100], actual_value[100], i = 0;
   {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-	adc_readed = analogRead(&hadc1);
+	if(v_rms) printf("Tensao: %.1f\r\n", v_rms);
 
-	printf("ADCValue: %f\r\n", (float)((adc_readed*250)/4096));
-
-	actual_tick[i] = HAL_GetTick();
-	actual_value[i] = adc_readed;
-	i++;
-
-	if(i == 90){
-		i = 0;
-	}
-	HAL_Delay(1);
+	HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -208,7 +213,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_7CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -216,6 +221,51 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 6250-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -279,6 +329,44 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
+
+	HAL_ADC_Start_IT(&hadc1) ;
+
+}
+
+void HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
+{
+	int count;
+
+	actual_tick[actual_sample] = HAL_GetTick();
+
+    // Le o ADC e transforma em tensao
+	voltage_sample[actual_sample++]  = (abs((HAL_ADC_GetValue (&hadc1) - ZERO_OFFSET)) * ADC_TO_V_STEP);
+
+	// Soma a leitura atual ao quadrado
+	v_rms_cycle += pow(voltage_sample[actual_sample],2);
+
+	// Calcula média quadratica da tensão do ciclo
+	if(actual_sample == (SAMPLES_PER_CYCLE - 1)) {
+		v_rms_cycle = sqrt((v_rms_cycle/SAMPLES_PER_CYCLE));
+
+		teste_v[j++] = v_rms_cycle;
+
+		v_rms_cycle = actual_sample = 0;
+	}
+
+
+	if(j == ONE_SECOND){
+		v_rms = 0;
+		for(count = 0; count < ONE_SECOND; count++){
+			v_rms += teste_v[count];
+		}
+		v_rms = v_rms/60;
+
+		j = 0;
+	}
+}
 
 /* USER CODE END 4 */
 
