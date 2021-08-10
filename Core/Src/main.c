@@ -36,8 +36,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ZERO_OFFSET 1950
-#define ADC_TO_V_STEP 0.2327
+#define ZERO_OFFSET_V 2080
+#define ZERO_OFFSET_I 1300
+#define ADC_TO_V_STEP 0.2025
+#define ADC_TO_I_STEP 0.00976
 #define SAMPLES_PER_CYCLE 64
 #define ONE_SECOND 60
 /* USER CODE END PD */
@@ -49,6 +51,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
 
 TIM_HandleTypeDef htim2;
 
@@ -56,7 +59,8 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 uint32_t actual_tick[512], actual_sample = 0, j = 0;
-float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, teste_v[100];
+float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, v_rms_cycle_vector[100];
+float current_sample[512], i_rms_cycle = 0, i_rms = 0, i_rms_cycle_vector[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,6 +69,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_ADC2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -111,9 +116,18 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_TIM2_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
-//  HAL_ADCEx_Calibration_Start(&hadc1);
+  if(HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK){
+	  printf("Falha ao calibrar o ADC1");
+  }
+  HAL_Delay(10);
+
+  if(HAL_ADCEx_Calibration_Start(&hadc2) != HAL_OK){
+	  printf("Falha ao calibrar o ADC2");
+  }
+  HAL_Delay(10);
 
   HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
@@ -124,7 +138,10 @@ int main(void)
   {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-	if(v_rms) printf("Tensao: %.1f\r\n", v_rms);
+	if(v_rms <= 20) v_rms = 0;
+	if(i_rms < 0.01) i_rms = 0;
+
+	printf("Tensao: %.1f    Corrente:%.5f\r\n", v_rms, i_rms);
 
 	HAL_Delay(1000);
     /* USER CODE END WHILE */
@@ -213,7 +230,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_7CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -221,6 +238,51 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
 
 }
 
@@ -331,41 +393,57 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
 
-	HAL_ADC_Start_IT(&hadc1) ;
+	int count;
+	static teste_ini = 0;
+
+	actual_tick[actual_sample] = HAL_GetTick();
+
+    /* Le os ADCs e converte para o valor real */
+	current_sample[actual_sample]  = ((HAL_ADC_GetValue (&hadc1)) * 3.3)/4096; //- ZERO_OFFSET_I)) * ADC_TO_I_STEP);
+	voltage_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc2) - ZERO_OFFSET_V)) * ADC_TO_V_STEP);
+	actual_sample++;
+
+	/* Soma quadratica dos pontos */
+	v_rms_cycle += pow(voltage_sample[actual_sample],2);
+	i_rms_cycle += pow(current_sample[actual_sample],2);
+
+	/* Calcula média quadratica da tensão do ciclo */
+	if(actual_sample == SAMPLES_PER_CYCLE) {
+		v_rms_cycle = sqrt((v_rms_cycle/SAMPLES_PER_CYCLE));
+		i_rms_cycle = sqrt((i_rms_cycle/SAMPLES_PER_CYCLE));
+
+		v_rms_cycle_vector[j] = v_rms_cycle;
+		i_rms_cycle_vector[j] = i_rms_cycle;
+		j++;
+
+		i_rms_cycle = v_rms_cycle = actual_sample = 0;
+	}
+
+
+	if(j == ONE_SECOND){
+		v_rms = i_rms = 0;
+		for(count = 0; count < ONE_SECOND; count++){
+			v_rms += v_rms_cycle_vector[count];
+			i_rms += i_rms_cycle_vector[count];
+		}
+		v_rms = v_rms/60;
+		i_rms = i_rms/60;
+
+		j = 0;
+	}
+
+	/*Inicia as conversoes*/
+	/*ADC Corrente*/
+	HAL_ADC_Start_IT(&hadc1);
+
+	/*ADC Tensao*/
+	HAL_ADC_Start_IT(&hadc2);
 
 }
 
 void HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
 {
-	int count;
 
-	actual_tick[actual_sample] = HAL_GetTick();
-
-    // Le o ADC e transforma em tensao
-	voltage_sample[actual_sample++]  = (abs((HAL_ADC_GetValue (&hadc1) - ZERO_OFFSET)) * ADC_TO_V_STEP);
-
-	// Soma a leitura atual ao quadrado
-	v_rms_cycle += pow(voltage_sample[actual_sample],2);
-
-	// Calcula média quadratica da tensão do ciclo
-	if(actual_sample == (SAMPLES_PER_CYCLE - 1)) {
-		v_rms_cycle = sqrt((v_rms_cycle/SAMPLES_PER_CYCLE));
-
-		teste_v[j++] = v_rms_cycle;
-
-		v_rms_cycle = actual_sample = 0;
-	}
-
-
-	if(j == ONE_SECOND){
-		v_rms = 0;
-		for(count = 0; count < ONE_SECOND; count++){
-			v_rms += teste_v[count];
-		}
-		v_rms = v_rms/60;
-
-		j = 0;
-	}
 }
 
 /* USER CODE END 4 */
