@@ -26,7 +26,6 @@
 #include "stdlib.h"
 #include "math.h"
 #include "float.h"
-#include "ADC/adc.h"
 #include "nrf24.h"
 /* USER CODE END Includes */
 
@@ -38,11 +37,12 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define ZERO_OFFSET_V 2080
-#define ZERO_OFFSET_I 1300
-#define ADC_TO_V_STEP 0.2025
-#define ADC_TO_I_STEP 0.00976
-#define SAMPLES_PER_CYCLE 64
+#define ZERO_OFFSET_I 2088
+#define ADC_TO_V_STEP 0.2030
+#define ADC_TO_I_STEP 0.0115
+#define SAMPLES_PER_CYCLE 128
 #define ONE_SECOND 60
+#define HALF_SECOND 30
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,8 +62,8 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 uint32_t actual_tick[512], actual_sample = 0, j = 0;
-float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, v_rms_cycle_vector[100];
-float current_sample[512], i_rms_cycle = 0, i_rms = 0, i_rms_cycle_vector[100];
+float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, v_rms_cycle_vector[129];
+float current_sample[512], i_rms_cycle = 0, i_rms = 0, i_rms_cycle_vector[129];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -146,11 +146,11 @@ int main(void)
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
 	if(v_rms <= 20) v_rms = 0;
-	if(i_rms < 0.01) i_rms = 0;
+	if(i_rms < 0.14) i_rms = 0;
 
-	printf("Tensao: %.1f    Corrente:%.5f\r\n", v_rms, i_rms);
+	printf("Tensao: %.1f  Corrente:%.3f\r\n", v_rms, i_rms);
 
-	HAL_Delay(1000);
+	HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -237,7 +237,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -282,7 +282,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -350,7 +350,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 1;
+  htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 6250-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -431,7 +431,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, NRF_CE_Pin|LED_2_Pin|LED_1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LED_2_Pin|LED_1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -465,7 +468,7 @@ void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
 	actual_tick[actual_sample] = HAL_GetTick();
 
     /* Le os ADCs e converte para o valor real */
-	current_sample[actual_sample]  = ((HAL_ADC_GetValue (&hadc1)) * 3.3)/4096; //- ZERO_OFFSET_I)) * ADC_TO_I_STEP);
+	current_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc1) - ZERO_OFFSET_I)) * ADC_TO_I_STEP);
 	voltage_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc2) - ZERO_OFFSET_V)) * ADC_TO_V_STEP);
 	actual_sample++;
 
@@ -486,14 +489,14 @@ void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
 	}
 
 
-	if(j == ONE_SECOND){
+	if(j == HALF_SECOND){
 		v_rms = i_rms = 0;
-		for(count = 0; count < ONE_SECOND; count++){
+		for(count = 0; count < HALF_SECOND; count++){
 			v_rms += v_rms_cycle_vector[count];
 			i_rms += i_rms_cycle_vector[count];
 		}
-		v_rms = v_rms/60;
-		i_rms = i_rms/60;
+		v_rms = v_rms/HALF_SECOND;
+		i_rms = i_rms/HALF_SECOND;
 
 		j = 0;
 	}
