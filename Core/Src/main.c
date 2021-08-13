@@ -39,7 +39,7 @@
 #define ZERO_OFFSET_V 2080
 #define ZERO_OFFSET_I 2088
 #define ADC_TO_V_STEP 0.2030
-#define ADC_TO_I_STEP 0.0115
+#define ADC_TO_I_STEP 0.0113
 #define SAMPLES_PER_CYCLE 128
 #define ONE_SECOND 60
 #define HALF_SECOND 30
@@ -61,9 +61,12 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint32_t actual_tick[512], actual_sample = 0, j = 0;
-float voltage_sample[512], v_rms_cycle = 0, v_rms = 0, v_rms_cycle_vector[129];
-float current_sample[512], i_rms_cycle = 0, i_rms = 0, i_rms_cycle_vector[129];
+uint32_t actual_tick[128], actual_sample = 0, j = 0;
+float voltage_sample[SAMPLES_PER_CYCLE], v_rms_cycle = 0, v_rms = 0, v_rms_cycles_vector[ONE_SECOND];
+float current_sample[SAMPLES_PER_CYCLE], i_rms_cycle = 0, i_rms = 0, i_rms_cycles_vector[ONE_SECOND];
+int pot_ativa_sample[SAMPLES_PER_CYCLE], pot_ativa_cycle = 0, pot_ativa = 0, pot_ativa_cycles_vector[ONE_SECOND];
+int pot_aparente = 0, pot_aparente_cycle = 0, pot_aparente_cycles_vector[SAMPLES_PER_CYCLE];
+int ready_values = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -148,9 +151,13 @@ int main(void)
 	if(v_rms <= 20) v_rms = 0;
 	if(i_rms < 0.14) i_rms = 0;
 
-	printf("Tensao: %.1f  Corrente:%.3f\r\n", v_rms, i_rms);
+	if(ready_values) {
+		printf("Tensao: %.1f  Corrente:%.3f  "
+				"Pot.Ativa:%d  Pot Aparente:%d\r\n", v_rms, i_rms, pot_ativa, pot_aparente);
+		ready_values = 0;
+	}
 
-	HAL_Delay(500);
+	HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -470,35 +477,52 @@ void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
     /* Le os ADCs e converte para o valor real */
 	current_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc1) - ZERO_OFFSET_I)) * ADC_TO_I_STEP);
 	voltage_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc2) - ZERO_OFFSET_V)) * ADC_TO_V_STEP);
-	actual_sample++;
+
+	/* Potencia ativa é a média ponto a ponto de V.I*/
+	pot_ativa_sample[actual_sample] = current_sample[actual_sample] * voltage_sample[actual_sample];
 
 	/* Soma quadratica dos pontos */
 	v_rms_cycle += pow(voltage_sample[actual_sample],2);
 	i_rms_cycle += pow(current_sample[actual_sample],2);
+	pot_ativa_cycle += pot_ativa_sample[actual_sample];
 
-	/* Calcula média quadratica da tensão do ciclo */
+	actual_sample++;
+
+	/* Calcula valores no final do ciclo*/
 	if(actual_sample == SAMPLES_PER_CYCLE) {
+
 		v_rms_cycle = sqrt((v_rms_cycle/SAMPLES_PER_CYCLE));
 		i_rms_cycle = sqrt((i_rms_cycle/SAMPLES_PER_CYCLE));
+		pot_ativa_cycle = (pot_ativa_cycle/SAMPLES_PER_CYCLE);
+		pot_aparente_cycle = v_rms_cycle * i_rms_cycle;
 
-		v_rms_cycle_vector[j] = v_rms_cycle;
-		i_rms_cycle_vector[j] = i_rms_cycle;
+		v_rms_cycles_vector[j] = v_rms_cycle;
+		i_rms_cycles_vector[j] = i_rms_cycle;
+		pot_ativa_cycles_vector[j] = pot_ativa_cycle;
+		pot_aparente_cycles_vector[j] = pot_aparente_cycle;
 		j++;
 
 		i_rms_cycle = v_rms_cycle = actual_sample = 0;
 	}
 
-
-	if(j == HALF_SECOND){
+	/* Média dos ciclos*/
+	if(j == ONE_SECOND){
 		v_rms = i_rms = 0;
-		for(count = 0; count < HALF_SECOND; count++){
-			v_rms += v_rms_cycle_vector[count];
-			i_rms += i_rms_cycle_vector[count];
+		for(count = 0; count < ONE_SECOND; count++){
+			v_rms += v_rms_cycles_vector[count];
+			i_rms += i_rms_cycles_vector[count];
+			pot_ativa += pot_ativa_cycles_vector[count];
+			pot_aparente += pot_aparente_cycles_vector[count];
 		}
-		v_rms = v_rms/HALF_SECOND;
-		i_rms = i_rms/HALF_SECOND;
+		v_rms = v_rms/ONE_SECOND;
+		i_rms = i_rms/ONE_SECOND;
+		pot_ativa = pot_ativa/ONE_SECOND;
+		pot_aparente = pot_aparente/ONE_SECOND;
 
 		j = 0;
+
+		/* Indica disponibilidade das novas médias*/
+		ready_values = 1;
 	}
 
 	/*Inicia as conversoes*/
