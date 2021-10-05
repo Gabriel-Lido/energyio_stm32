@@ -66,6 +66,12 @@ void Error_Handler(void);
 #define LED_2_GPIO_Port GPIOB
 #define LED_1_Pin GPIO_PIN_7
 #define LED_1_GPIO_Port GPIOB
+#define SW2_Pin GPIO_PIN_8
+#define SW2_GPIO_Port GPIOB
+#define SW2_EXTI_IRQn EXTI9_5_IRQn
+#define SW1_Pin GPIO_PIN_9
+#define SW1_GPIO_Port GPIOB
+#define SW1_EXTI_IRQn EXTI9_5_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -111,9 +111,9 @@ bool NRF24_available(void);
 //17. Read received data
 bool NRF24_read( void* buf, uint8_t len );
 //18. Open Tx pipe for writing (Cannot perform this while Listenning, has to call NRF24_stopListening)
-void NRF24_openWritingPipe(uint64_t address);
+void NRF24_openWritingPipe(const uint8_t* address, uint8_t size);
 //19. Open reading pipe
-void NRF24_openReadingPipe(uint8_t number, uint64_t address);
+void NRF24_openReadingPipe(uint8_t number,  uint8_t* address, uint8_t size);
 //20 set transmit retries (rf24_Retries_e) and delay
 void NRF24_setRetries(uint8_t delay, uint8_t count);
 //21. Set RF channel frequency

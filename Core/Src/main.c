@@ -86,7 +86,7 @@ static void MX_SPI1_Init(void);
 int _write(int file, char *ptr, int len)
 {
   /* Implement your write code here, this is used by puts and printf for example */
-  HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 10);
+  HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, 10);
 
   return len;
 }
@@ -127,37 +127,93 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-  if(HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK){
-	  printf("Falha ao calibrar o ADC1");
+  if (HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK)
+  {
+    printf("Falha ao calibrar o ADC1");
   }
   HAL_Delay(10);
 
-  if(HAL_ADCEx_Calibration_Start(&hadc2) != HAL_OK){
-	  printf("Falha ao calibrar o ADC2");
+  if (HAL_ADCEx_Calibration_Start(&hadc2) != HAL_OK)
+  {
+    printf("Falha ao calibrar o ADC2");
   }
   HAL_Delay(10);
 
   HAL_TIM_Base_Start_IT(&htim2);
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
+
+  float payload = 0.0;
+
+  NRF24_setPayloadSize(sizeof(payload));
+
+  uint8_t address[][6] = {"1Node", "2Node"};
+  // It is very helpful to think of an address as a path instead of as
+  // an identifying device destination
+
+  // to use different addresses on a pair of radios, we need a variable to
+  // uniquely identify which address this radio will use to transmit
+
+  NRF24_openWritingPipe(address[1], sizeof(address[1]) - 1);
+
+  NRF24_openReadingPipe(1, address[0], sizeof(address[0]) - 1);
+
+  //NRF24_startListening();
+  NRF24_stopListening();
+
+  printRadioSettings();
+
+  printf("END SETUP\n\n");
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-	if(v_rms <= 20) v_rms = 0;
-	if(i_rms < 0.14) i_rms = 0;
+    if (v_rms <= 20)
+      v_rms = 0;
+    if (i_rms < 0.14)
+      i_rms = 0;
 
-	if(ready_values) {
-		printf("Tensao: %.1f  Corrente:%.3f  "
-				"Pot.Ativa:%d  Pot Aparente:%d\r\n", v_rms, i_rms, pot_ativa, pot_aparente);
-		ready_values = 0;
+    if (ready_values)
+    {
+      printf("Tensao: %.1f  Corrente:%.3f  "
+             "Pot.Ativa:%d  Pot Aparente:%d\r\n",
+             v_rms, i_rms, pot_ativa, pot_aparente);
+      ready_values = 0;
+    }
+
+    HAL_Delay(10);
+
+    //	/*
+    unsigned long start_time = HAL_GetTick();
+    bool report = NRF24_write(&payload, sizeof(float)); // transmit & save the report
+    unsigned long end_time = HAL_GetTick();
+
+    if (report)
+    {
+      printf("Transmission successful!"); // payload was delivered
+      printf("Tranmission time %lu ms", end_time - start_time);
+      printf("\nSent: %f\n", payload);
+      payload += 0.01; // increment float payload
+      HAL_Delay(1000);
+    }
+    //	 */
+
+    /*
+	uint8_t pipe;
+	if(NRF24_availablePipe(&pipe)){
+	 uint8_t bytes = NRF24_getPayloadSize(); // get the size of the payload
+	 NRF24_read(&payload, bytes);            // fetch payload from FIFO
+	 printf("Received %d \n", bytes);// print the size of the payload
+	 printf(" bytes on pipe %d \n", pipe);
+	 printf("Payload : %f", payload);
 	}
+	*/
 
-	HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -191,8 +247,7 @@ void SystemClock_Config(void)
   }
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -252,7 +307,6 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -297,7 +351,6 @@ static void MX_ADC2_Init(void)
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
-
 }
 
 /**
@@ -335,7 +388,6 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
 }
 
 /**
@@ -359,7 +411,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 6250-1;
+  htim2.Init.Period = 6250 - 1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -380,7 +432,6 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
-
 }
 
 /**
@@ -413,7 +464,6 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
-
 }
 
 /**
@@ -441,7 +491,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LED_2_Pin|LED_1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, LED_2_Pin | LED_1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -458,85 +508,120 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(NRF_CSN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : NRF_CE_Pin LED_2_Pin LED_1_Pin */
-  GPIO_InitStruct.Pin = NRF_CE_Pin|LED_2_Pin|LED_1_Pin;
+  GPIO_InitStruct.Pin = NRF_CE_Pin | LED_2_Pin | LED_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : SW2_Pin SW1_Pin */
+  GPIO_InitStruct.Pin = SW2_Pin | SW1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback (TIM_HandleTypeDef *htim) {
-
-	int count;
-	static teste_ini = 0;
-
-	actual_tick[actual_sample] = HAL_GetTick();
-
-    /* Le os ADCs e converte para o valor real */
-	current_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc1) - ZERO_OFFSET_I)) * ADC_TO_I_STEP);
-	voltage_sample[actual_sample]  = (abs((HAL_ADC_GetValue (&hadc2) - ZERO_OFFSET_V)) * ADC_TO_V_STEP);
-
-	/* Potencia ativa é a média ponto a ponto de V.I*/
-	pot_ativa_sample[actual_sample] = current_sample[actual_sample] * voltage_sample[actual_sample];
-
-	/* Soma quadratica dos pontos */
-	v_rms_cycle += pow(voltage_sample[actual_sample],2);
-	i_rms_cycle += pow(current_sample[actual_sample],2);
-	pot_ativa_cycle += pot_ativa_sample[actual_sample];
-
-	actual_sample++;
-
-	/* Calcula valores no final do ciclo*/
-	if(actual_sample == SAMPLES_PER_CYCLE) {
-
-		v_rms_cycle = sqrt((v_rms_cycle/SAMPLES_PER_CYCLE));
-		i_rms_cycle = sqrt((i_rms_cycle/SAMPLES_PER_CYCLE));
-		pot_ativa_cycle = (pot_ativa_cycle/SAMPLES_PER_CYCLE);
-		pot_aparente_cycle = v_rms_cycle * i_rms_cycle;
-
-		v_rms_cycles_vector[j] = v_rms_cycle;
-		i_rms_cycles_vector[j] = i_rms_cycle;
-		pot_ativa_cycles_vector[j] = pot_ativa_cycle;
-		pot_aparente_cycles_vector[j] = pot_aparente_cycle;
-		j++;
-
-		i_rms_cycle = v_rms_cycle = actual_sample = 0;
-	}
-
-	/* Média dos ciclos*/
-	if(j == ONE_SECOND){
-		v_rms = i_rms = 0;
-		for(count = 0; count < ONE_SECOND; count++){
-			v_rms += v_rms_cycles_vector[count];
-			i_rms += i_rms_cycles_vector[count];
-			pot_ativa += pot_ativa_cycles_vector[count];
-			pot_aparente += pot_aparente_cycles_vector[count];
-		}
-		v_rms = v_rms/ONE_SECOND;
-		i_rms = i_rms/ONE_SECOND;
-		pot_ativa = pot_ativa/ONE_SECOND;
-		pot_aparente = pot_aparente/ONE_SECOND;
-
-		j = 0;
-
-		/* Indica disponibilidade das novas médias*/
-		ready_values = 1;
-	}
-
-	/*Inicia as conversoes*/
-	/*ADC Corrente*/
-	HAL_ADC_Start_IT(&hadc1);
-
-	/*ADC Tensao*/
-	HAL_ADC_Start_IT(&hadc2);
-
-}
-
-void HAL_ADC_ConvCpltCallback (ADC_HandleTypeDef * hadc)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 
+  int count;
+  static teste_ini = 0;
+
+  actual_tick[actual_sample] = HAL_GetTick();
+
+  /* Le os ADCs e converte para o valor real */
+  current_sample[actual_sample] = (abs((HAL_ADC_GetValue(&hadc1) - ZERO_OFFSET_I)) * ADC_TO_I_STEP);
+  voltage_sample[actual_sample] = (abs((HAL_ADC_GetValue(&hadc2) - ZERO_OFFSET_V)) * ADC_TO_V_STEP);
+
+  /* Potencia ativa é a média ponto a ponto de V.I*/
+  pot_ativa_sample[actual_sample] = current_sample[actual_sample] * voltage_sample[actual_sample];
+
+  /* Soma quadratica dos pontos */
+  v_rms_cycle += pow(voltage_sample[actual_sample], 2);
+  i_rms_cycle += pow(current_sample[actual_sample], 2);
+  pot_ativa_cycle += pot_ativa_sample[actual_sample];
+
+  actual_sample++;
+
+  /* Calcula valores no final do ciclo*/
+  if (actual_sample == SAMPLES_PER_CYCLE)
+  {
+
+    v_rms_cycle = sqrt((v_rms_cycle / SAMPLES_PER_CYCLE));
+    i_rms_cycle = sqrt((i_rms_cycle / SAMPLES_PER_CYCLE));
+    pot_ativa_cycle = (pot_ativa_cycle / SAMPLES_PER_CYCLE);
+    pot_aparente_cycle = v_rms_cycle * i_rms_cycle;
+
+    v_rms_cycles_vector[j] = v_rms_cycle;
+    i_rms_cycles_vector[j] = i_rms_cycle;
+    pot_ativa_cycles_vector[j] = pot_ativa_cycle;
+    pot_aparente_cycles_vector[j] = pot_aparente_cycle;
+    j++;
+
+    i_rms_cycle = v_rms_cycle = actual_sample = 0;
+  }
+
+  /* Média dos ciclos*/
+  if (j == ONE_SECOND)
+  {
+    v_rms = i_rms = 0;
+    for (count = 0; count < ONE_SECOND; count++)
+    {
+      v_rms += v_rms_cycles_vector[count];
+      i_rms += i_rms_cycles_vector[count];
+      pot_ativa += pot_ativa_cycles_vector[count];
+      pot_aparente += pot_aparente_cycles_vector[count];
+    }
+    v_rms = v_rms / ONE_SECOND;
+    i_rms = i_rms / ONE_SECOND;
+    pot_ativa = pot_ativa / ONE_SECOND;
+    pot_aparente = pot_aparente / ONE_SECOND;
+
+    j = 0;
+
+    /* Indica disponibilidade das novas médias*/
+    ready_values = 1;
+  }
+
+  /*Inicia as conversoes*/
+  /*ADC Corrente*/
+  HAL_ADC_Start_IT(&hadc1);
+
+  /*ADC Tensao*/
+  HAL_ADC_Start_IT(&hadc2);
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+}
+
+unsigned long last_micros;
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  unsigned long debouncing_time = 200; //Debouncing Time in Milliseconds
+  if (GPIO_Pin == SW1_Pin)
+  {
+    if ((HAL_GetTick() - last_micros >= debouncing_time))
+    {
+      printf("\n\n\nSW1\n\n\n");
+      HAL_GPIO_TogglePin(LED_1_GPIO_Port, LED_1_Pin);
+      last_micros = HAL_GetTick();
+    }
+  }
+  if (GPIO_Pin == SW2_Pin)
+  {
+    if ((HAL_GetTick() - last_micros >= debouncing_time))
+    {
+      printf("\n\n\nSW2\n\n\n");
+      HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
+      last_micros = HAL_GetTick();
+    }
+  }
 }
 
 /* USER CODE END 4 */
@@ -556,7 +641,7 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
