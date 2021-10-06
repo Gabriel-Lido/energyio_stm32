@@ -37,6 +37,13 @@ typedef struct _DataReport {
     DataType type; 
 } DataReport;
 
+typedef struct _EnergySensorReport { 
+    double v_rms; 
+    double i_rms; 
+    int32_t pot_ativa; 
+    int32_t pot_aparente; 
+} EnergySensorReport;
+
 /* *
  Mensagem para registrar um Hub
 
@@ -76,9 +83,11 @@ extern "C" {
 #endif
 
 /* Initializer values for message structs */
+#define EnergySensorReport_init_default          {0, 0, 0, 0}
 #define DataReport_init_default                  {0, 0, _DataType_MIN}
 #define SensorRegister_init_default              {_SensorType_MIN, 0, ""}
 #define HubRegister_init_default                 {"", ""}
+#define EnergySensorReport_init_zero             {0, 0, 0, 0}
 #define DataReport_init_zero                     {0, 0, _DataType_MIN}
 #define SensorRegister_init_zero                 {_SensorType_MIN, 0, ""}
 #define HubRegister_init_zero                    {"", ""}
@@ -87,6 +96,10 @@ extern "C" {
 #define DataReport_datetime_tag                  1
 #define DataReport_data_tag                      2
 #define DataReport_type_tag                      3
+#define EnergySensorReport_v_rms_tag             1
+#define EnergySensorReport_i_rms_tag             2
+#define EnergySensorReport_pot_ativa_tag         3
+#define EnergySensorReport_pot_aparente_tag      4
 #define HubRegister_secret_tag                   1
 #define HubRegister_mac_address_tag              2
 #define SensorRegister_type_tag                  1
@@ -94,6 +107,14 @@ extern "C" {
 #define SensorRegister_serial_tag                3
 
 /* Struct field encoding specification for nanopb */
+#define EnergySensorReport_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, DOUBLE,   v_rms,             1) \
+X(a, STATIC,   SINGULAR, DOUBLE,   i_rms,             2) \
+X(a, STATIC,   SINGULAR, INT32,    pot_ativa,         3) \
+X(a, STATIC,   SINGULAR, INT32,    pot_aparente,      4)
+#define EnergySensorReport_CALLBACK NULL
+#define EnergySensorReport_DEFAULT NULL
+
 #define DataReport_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT64,   datetime,          1) \
 X(a, STATIC,   SINGULAR, DOUBLE,   data,              2) \
@@ -114,17 +135,20 @@ X(a, STATIC,   SINGULAR, STRING,   mac_address,       2)
 #define HubRegister_CALLBACK NULL
 #define HubRegister_DEFAULT NULL
 
+extern const pb_msgdesc_t EnergySensorReport_msg;
 extern const pb_msgdesc_t DataReport_msg;
 extern const pb_msgdesc_t SensorRegister_msg;
 extern const pb_msgdesc_t HubRegister_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
+#define EnergySensorReport_fields &EnergySensorReport_msg
 #define DataReport_fields &DataReport_msg
 #define SensorRegister_fields &SensorRegister_msg
 #define HubRegister_fields &HubRegister_msg
 
 /* Maximum encoded size of messages (where known) */
 #define DataReport_size                          22
+#define EnergySensorReport_size                  40
 #define HubRegister_size                         260
 #define SensorRegister_size                      143
 

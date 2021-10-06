@@ -27,6 +27,11 @@
 #include "math.h"
 #include "float.h"
 #include "nrf24.h"
+#include "messages.pb.h"
+#include "pb.h"
+#include "pb_encode.h"
+#include "pb_decode.h"
+#include "pb_common.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,6 +72,8 @@ float current_sample[SAMPLES_PER_CYCLE], i_rms_cycle = 0, i_rms = 0, i_rms_cycle
 int pot_ativa_sample[SAMPLES_PER_CYCLE], pot_ativa_cycle = 0, pot_ativa = 0, pot_ativa_cycles_vector[ONE_SECOND];
 int pot_aparente = 0, pot_aparente_cycle = 0, pot_aparente_cycles_vector[SAMPLES_PER_CYCLE];
 int ready_values = 0;
+uint8_t data[128];
+uint16_t length;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -143,9 +150,7 @@ int main(void)
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
-  float payload = 0.0;
-
-  NRF24_setPayloadSize(sizeof(payload));
+  NRF24_setPayloadSize(sizeof(data));
 
   uint8_t address[][6] = {"1Node", "2Node"};
   // It is very helpful to think of an address as a path instead of as
@@ -188,20 +193,25 @@ int main(void)
 
     HAL_Delay(10);
 
-    //	/*
+    w_message(v_rms, i_rms, pot_ativa, pot_aparente);
+
+    HAL_Delay(1000);
+
+    //r_message(data, sizeof(data));
+
+    /*
     unsigned long start_time = HAL_GetTick();
-    bool report = NRF24_write(&payload, sizeof(float)); // transmit & save the report
+    bool report = NRF24_write(&data, length); // transmit & save the report
     unsigned long end_time = HAL_GetTick();
 
     if (report)
     {
       printf("Transmission successful!"); // payload was delivered
       printf("Tranmission time %lu ms", end_time - start_time);
-      printf("\nSent: %f\n", payload);
-      payload += 0.01; // increment float payload
+      printf("\nSent: %f\n", data);
       HAL_Delay(1000);
     }
-    //	 */
+    */
 
     /*
 	uint8_t pipe;
@@ -622,6 +632,43 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       last_micros = HAL_GetTick();
     }
   }
+}
+
+void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
+{
+  uint8_t buffer[128];
+  EnergySensorReport msg = EnergySensorReport_init_zero;
+
+  pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
+  msg.v_rms, v_rms;
+  msg.i_rms = i_rms;
+  msg.pot_aparente = pot_ap;
+  msg.pot_ativa = pot_at;
+  pb_encode(&stream, EnergySensorReport_fields, &msg);
+
+  printf("\nMSG SERIALIZED : ");
+  for (int i = 0; i < stream.bytes_written; i++)
+  {
+    data[i] = buffer[i];
+    printf("%02X", data[i]);
+  }
+  printf("\n");
+
+  length = stream.bytes_written;
+}
+
+void r_message(uint8_t *_data, int _data_len)
+{
+  DataReport msg = DataReport_init_zero;
+  pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
+  pb_decode(&stream, DataReport_fields, &msg);
+
+  printf("datetime :%d", msg.datetime);
+  printf("DataType: %d", msg.type);
+  printf("Data: %s", msg.data);
+
+  // this->user = msg.user;
 }
 
 /* USER CODE END 4 */
