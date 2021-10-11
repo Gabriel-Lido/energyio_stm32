@@ -242,11 +242,14 @@ void NRF24_begin(GPIO_TypeDef *nrf24PORT, uint16_t nrfCSN_Pin, uint16_t nrfCE_Pi
 	NRF24_setDataRate(RF24_250KBPS);
 	//Initalise CRC length to 16-bit (2 bytes)
 	NRF24_setCRCLength(RF24_CRC_16);
+	// Set Auto ACK true
+	NRF24_setAutoAck(true);
 	//Disable dynamic payload
-	NRF24_disableDynamicPayloads();
+	//	NRF24_disableDynamicPayloads();
+	NRF24_enableAckPayload();
+	NRF24_enableDynamicPayloads();
 	//Set payload size
 	NRF24_setPayloadSize(32);
-
 	//Reset status register
 	NRF24_resetStatus();
 	//Initialise channel to 76
@@ -902,7 +905,7 @@ void printConfigReg(void)
 
 	reg8Val = NRF24_read_register(0x00);
 	printf(uartTxBuf, "CONFIG reg:\r\n		PWR_UP:		%d\r\n		PRIM_RX:	%d\r\n",
-			_BOOL(reg8Val & (1 << 1)), _BOOL(reg8Val & (1 << 0)));
+		   _BOOL(reg8Val & (1 << 1)), _BOOL(reg8Val & (1 << 0)));
 	HAL_UART_Transmit(&nrf24_huart, (uint8_t *)uartTxBuf, strlen(uartTxBuf), 10);
 
 	printf(uartTxBuf, "\r\n-------------------------\r\n");

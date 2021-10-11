@@ -76,7 +76,8 @@ int ready_values = 0;
 uint8_t address[][6] = {"1Node", "2Node"};
 
 uint8_t data[32];
-uint16_t length;
+uint8_t length;
+bool reported = false;
 
 /* USER CODE END PV */
 
@@ -154,23 +155,12 @@ int main(void)
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
-  NRF24_setDataRate(RF24_250KBPS);
-//  NRF24_setDataRate(RF24_1MBPS);
-
-  NRF24_setPayloadSize(sizeof(data));
-
-  NRF24_setCRCLength(RF24_CRC_8);
-
-  NRF24_setAutoAck(true);
-
-  //NRF24_setChannel(69);
-
-  NRF24_setPALevel(RF24_PA_0dB);
-
   NRF24_openWritingPipe(address[1], sizeof(address[1]) - 1);
 
   NRF24_openReadingPipe(1, address[0], sizeof(address[0]) - 1);
-  NRF24_openReadingPipe(2, address[1], sizeof(address[1]) - 1);
+  //  NRF24_openReadingPipe(2, address[1], sizeof(address[1]) - 1);
+
+  NRF24_stopListening();
 
   printRadioSettings();
 
@@ -194,22 +184,27 @@ int main(void)
       printf("Tensao: %.1f  Corrente:%.3f  "
              "Pot.Ativa:%d  Pot Aparente:%d\r\n",
              v_rms, i_rms, pot_ativa, pot_aparente);
+      w_message(v_rms, i_rms, pot_ativa, pot_aparente);
+      while(reported != true)
+      {nrf_report();}
+      reported = false;
       ready_values = 0;
     }
 
     HAL_Delay(10);
 
-    w_message(v_rms, i_rms, pot_ativa, pot_aparente);
     //r_message(data, sizeof(data));
 
-    NRF24_startListening();
-    HAL_Delay(1000);
-    listen();
+    //    NRF24_startListening();
+    //    HAL_Delay(1000);
+    //    listen();
 
-    NRF24_stopListening();
-    HAL_Delay(1000);
-    report();
-/*
+    //    HAL_Delay(1000);
+
+    //    printf("payload size %d", NRF24_getPayloadSize());
+
+
+    /*
 
 */
 
@@ -625,7 +620,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
 {
-  uint8_t buffer[128];
+  uint8_t buffer[32];
   EnergySensorReport msg = EnergySensorReport_init_zero;
 
   pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
@@ -644,58 +639,55 @@ void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
   }
   printf("\n");
 
-  length = stream.bytes_written;
+  data[32] = (uint8_t)stream.bytes_written;
 }
 
 void r_message(uint8_t *_data, int _data_len)
 {
-	EnergySensorReport msg = EnergySensorReport_init_zero;
-	pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
-	pb_decode(&stream, EnergySensorReport_fields, &msg);
+  EnergySensorReport msg = EnergySensorReport_init_zero;
+  pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
+  pb_decode(&stream, EnergySensorReport_fields, &msg);
 
   printf("DECODED: Tensao: %.1f  Corrente:%.3f  "
-               "Pot.Ativa:%d  Pot Aparente:%d\r\n",
-               msg.v_rms, msg.i_rms, msg.pot_ativa, msg.pot_aparente);
+         "Pot.Ativa:%d  Pot Aparente:%d\r\n",
+         msg.v_rms, msg.i_rms, msg.pot_ativa, msg.pot_aparente);
 
   // this->user = msg.user;
 }
 
-void report()
+void nrf_report()
 {
-	 unsigned long start_time = HAL_GetTick();
-	    bool reported = NRF24_write(&data, sizeof(float)); // transmit & save the report
-	    unsigned long end_time = HAL_GetTick();
+  unsigned long start_time = HAL_GetTick();
+  reported = NRF24_write(&data, sizeof(data)); // transmit & save the report
+  unsigned long end_time = HAL_GetTick();
 
-	    if (reported)
-	    {
-	      printf("Transmission successful!"); // payload was delivered
-	      printf("Tranmission time %lu ms\nSent: ", end_time - start_time);
-	      for (int i = 0; i < length; i++)
-	        {
-	          printf("%02X", data[i]);
-	        }
-	      printf("\n");
-	    }
-	    else
-	    {
-	    	printf("\nTransmission fail!\n");
-	    }
+  if (reported)
+  {
+    printf("Transmission successful!"); // payload was delivered
+    printf("Tranmission time %lu ms\nSent: ", end_time - start_time);
+    for (int i = 0; i < 32; i++)
+    {
+      printf("%02X", data[i]);
+    }
+    printf("\n");
+  }
 }
 
-void listen()
+void nrf_listen()
 {
-	uint8_t pipe;
-	if(NRF24_availablePipe(&pipe)){
-	 uint8_t bytes = NRF24_getPayloadSize(); // get the size of the payload
-	 NRF24_read(&data, bytes);            // fetch payload from FIFO
-	 printf("Received %d \n", bytes);// print the size of the payload
-	 printf(" bytes on pipe %d \n", pipe);
-	 for (int i = 0; i < bytes; i++)
-	         {
-	           printf("%02X", data[i]);
-	         }
-	 printf("\n");
-	}
+  uint8_t pipe;
+  if (NRF24_availablePipe(&pipe))
+  {
+    uint8_t bytes = NRF24_getPayloadSize(); // get the size of the payload
+    NRF24_read(&data, bytes);               // fetch payload from FIFO
+    printf("Received %d \n", bytes);        // print the size of the payload
+    printf(" bytes on pipe %d \n", pipe);
+    for (int i = 0; i < bytes; i++)
+    {
+      printf("%02X", data[i]);
+    }
+    printf("\n");
+  }
 }
 
 /* USER CODE END 4 */

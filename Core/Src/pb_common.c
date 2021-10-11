@@ -17,58 +17,62 @@ static bool load_descriptor_values(pb_field_iter_t *iter)
     word0 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index]);
     iter->type = (pb_type_t)((word0 >> 8) & 0xFF);
 
-    switch(word0 & 3)
+    switch (word0 & 3)
     {
-        case 0: {
-            /* 1-word format */
-            iter->array_size = 1;
-            iter->tag = (pb_size_t)((word0 >> 2) & 0x3F);
-            size_offset = (int_least8_t)((word0 >> 24) & 0x0F);
-            data_offset = (word0 >> 16) & 0xFF;
-            iter->data_size = (pb_size_t)((word0 >> 28) & 0x0F);
-            break;
-        }
+    case 0:
+    {
+        /* 1-word format */
+        iter->array_size = 1;
+        iter->tag = (pb_size_t)((word0 >> 2) & 0x3F);
+        size_offset = (int_least8_t)((word0 >> 24) & 0x0F);
+        data_offset = (word0 >> 16) & 0xFF;
+        iter->data_size = (pb_size_t)((word0 >> 28) & 0x0F);
+        break;
+    }
 
-        case 1: {
-            /* 2-word format */
-            uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
+    case 1:
+    {
+        /* 2-word format */
+        uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
 
-            iter->array_size = (pb_size_t)((word0 >> 16) & 0x0FFF);
-            iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 28) << 6));
-            size_offset = (int_least8_t)((word0 >> 28) & 0x0F);
-            data_offset = word1 & 0xFFFF;
-            iter->data_size = (pb_size_t)((word1 >> 16) & 0x0FFF);
-            break;
-        }
+        iter->array_size = (pb_size_t)((word0 >> 16) & 0x0FFF);
+        iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 28) << 6));
+        size_offset = (int_least8_t)((word0 >> 28) & 0x0F);
+        data_offset = word1 & 0xFFFF;
+        iter->data_size = (pb_size_t)((word1 >> 16) & 0x0FFF);
+        break;
+    }
 
-        case 2: {
-            /* 4-word format */
-            uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
-            uint32_t word2 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 2]);
-            uint32_t word3 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 3]);
+    case 2:
+    {
+        /* 4-word format */
+        uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
+        uint32_t word2 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 2]);
+        uint32_t word3 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 3]);
 
-            iter->array_size = (pb_size_t)(word0 >> 16);
-            iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 8) << 6));
-            size_offset = (int_least8_t)(word1 & 0xFF);
-            data_offset = word2;
-            iter->data_size = (pb_size_t)word3;
-            break;
-        }
+        iter->array_size = (pb_size_t)(word0 >> 16);
+        iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 8) << 6));
+        size_offset = (int_least8_t)(word1 & 0xFF);
+        data_offset = word2;
+        iter->data_size = (pb_size_t)word3;
+        break;
+    }
 
-        default: {
-            /* 8-word format */
-            uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
-            uint32_t word2 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 2]);
-            uint32_t word3 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 3]);
-            uint32_t word4 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 4]);
+    default:
+    {
+        /* 8-word format */
+        uint32_t word1 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 1]);
+        uint32_t word2 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 2]);
+        uint32_t word3 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 3]);
+        uint32_t word4 = PB_PROGMEM_READU32(iter->descriptor->field_info[iter->field_info_index + 4]);
 
-            iter->array_size = (pb_size_t)word4;
-            iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 8) << 6));
-            size_offset = (int_least8_t)(word1 & 0xFF);
-            data_offset = word2;
-            iter->data_size = (pb_size_t)word3;
-            break;
-        }
+        iter->array_size = (pb_size_t)word4;
+        iter->tag = (pb_size_t)(((word0 >> 2) & 0x3F) | ((word1 >> 8) << 6));
+        size_offset = (int_least8_t)(word1 & 0xFF);
+        data_offset = word2;
+        iter->data_size = (pb_size_t)word3;
+        break;
+    }
     }
 
     if (!iter->message)
@@ -79,11 +83,11 @@ static bool load_descriptor_values(pb_field_iter_t *iter)
     }
     else
     {
-        iter->pField = (char*)iter->message + data_offset;
+        iter->pField = (char *)iter->message + data_offset;
 
         if (size_offset)
         {
-            iter->pSize = (char*)iter->pField - size_offset;
+            iter->pSize = (char *)iter->pField - size_offset;
         }
         else if (PB_HTYPE(iter->type) == PB_HTYPE_REPEATED &&
                  (PB_ATYPE(iter->type) == PB_ATYPE_STATIC ||
@@ -99,7 +103,7 @@ static bool load_descriptor_values(pb_field_iter_t *iter)
 
         if (PB_ATYPE(iter->type) == PB_ATYPE_POINTER && iter->pField != NULL)
         {
-            iter->pData = *(void**)iter->pField;
+            iter->pData = *(void **)iter->pField;
         }
         else
         {
@@ -165,7 +169,7 @@ bool pb_field_iter_begin(pb_field_iter_t *iter, const pb_msgdesc_t *desc, void *
 
 bool pb_field_iter_begin_extension(pb_field_iter_t *iter, pb_extension_t *extension)
 {
-    const pb_msgdesc_t *msg = (const pb_msgdesc_t*)extension->type->arg;
+    const pb_msgdesc_t *msg = (const pb_msgdesc_t *)extension->type->arg;
     bool status;
 
     uint32_t word0 = PB_PROGMEM_READU32(msg->field_info[0]);
@@ -279,7 +283,8 @@ static void *pb_const_cast(const void *p)
     /* Note: this casts away const, in order to use the common field iterator
      * logic for both encoding and decoding. The cast is done using union
      * to avoid spurious compiler warnings. */
-    union {
+    union
+    {
         void *p1;
         const void *p2;
     } t;
@@ -294,14 +299,14 @@ bool pb_field_iter_begin_const(pb_field_iter_t *iter, const pb_msgdesc_t *desc, 
 
 bool pb_field_iter_begin_extension_const(pb_field_iter_t *iter, const pb_extension_t *extension)
 {
-    return pb_field_iter_begin_extension(iter, (pb_extension_t*)pb_const_cast(extension));
+    return pb_field_iter_begin_extension(iter, (pb_extension_t *)pb_const_cast(extension));
 }
 
 bool pb_default_field_callback(pb_istream_t *istream, pb_ostream_t *ostream, const pb_field_t *field)
 {
     if (field->data_size == sizeof(pb_callback_t))
     {
-        pb_callback_t *pCallback = (pb_callback_t*)field->pData;
+        pb_callback_t *pCallback = (pb_callback_t *)field->pData;
 
         if (pCallback != NULL)
         {
@@ -318,7 +323,6 @@ bool pb_default_field_callback(pb_istream_t *istream, pb_ostream_t *ostream, con
     }
 
     return true; /* Success, but didn't do anything */
-
 }
 
 #ifdef PB_VALIDATE_UTF8
@@ -333,7 +337,7 @@ bool pb_default_field_callback(pb_istream_t *istream, pb_ostream_t *ostream, con
 
 bool pb_validate_utf8(const char *str)
 {
-    const pb_byte_t *s = (const pb_byte_t*)str;
+    const pb_byte_t *s = (const pb_byte_t *)str;
     while (*s)
     {
         if (*s < 0x80)
@@ -345,7 +349,7 @@ bool pb_validate_utf8(const char *str)
         {
             /* 110XXXXx 10xxxxxx */
             if ((s[1] & 0xc0) != 0x80 ||
-                (s[0] & 0xfe) == 0xc0)                        /* overlong? */
+                (s[0] & 0xfe) == 0xc0) /* overlong? */
                 return false;
             else
                 s += 2;
@@ -355,10 +359,10 @@ bool pb_validate_utf8(const char *str)
             /* 1110XXXX 10Xxxxxx 10xxxxxx */
             if ((s[1] & 0xc0) != 0x80 ||
                 (s[2] & 0xc0) != 0x80 ||
-                (s[0] == 0xe0 && (s[1] & 0xe0) == 0x80) ||    /* overlong? */
-                (s[0] == 0xed && (s[1] & 0xe0) == 0xa0) ||    /* surrogate? */
+                (s[0] == 0xe0 && (s[1] & 0xe0) == 0x80) || /* overlong? */
+                (s[0] == 0xed && (s[1] & 0xe0) == 0xa0) || /* surrogate? */
                 (s[0] == 0xef && s[1] == 0xbf &&
-                (s[2] & 0xfe) == 0xbe))                 /* U+FFFE or U+FFFF? */
+                 (s[2] & 0xfe) == 0xbe)) /* U+FFFE or U+FFFF? */
                 return false;
             else
                 s += 3;
@@ -385,4 +389,3 @@ bool pb_validate_utf8(const char *str)
 }
 
 #endif
-
