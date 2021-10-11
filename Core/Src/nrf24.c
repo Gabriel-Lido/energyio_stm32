@@ -897,15 +897,15 @@ void printConfigReg(void)
 	uint8_t reg8Val;
 	char uartTxBuf[100];
 
-	sprintf(uartTxBuf, "\r\n-------------------------\r\n");
+	printf(uartTxBuf, "\r\n-------------------------\r\n");
 	HAL_UART_Transmit(&nrf24_huart, (uint8_t *)uartTxBuf, strlen(uartTxBuf), 10);
 
 	reg8Val = NRF24_read_register(0x00);
-	sprintf(uartTxBuf, "CONFIG reg:\r\n		PWR_UP:		%d\r\n		PRIM_RX:	%d\r\n",
+	printf(uartTxBuf, "CONFIG reg:\r\n		PWR_UP:		%d\r\n		PRIM_RX:	%d\r\n",
 			_BOOL(reg8Val & (1 << 1)), _BOOL(reg8Val & (1 << 0)));
 	HAL_UART_Transmit(&nrf24_huart, (uint8_t *)uartTxBuf, strlen(uartTxBuf), 10);
 
-	sprintf(uartTxBuf, "\r\n-------------------------\r\n");
+	printf(uartTxBuf, "\r\n-------------------------\r\n");
 	HAL_UART_Transmit(&nrf24_huart, (uint8_t *)uartTxBuf, strlen(uartTxBuf), 10);
 }
 

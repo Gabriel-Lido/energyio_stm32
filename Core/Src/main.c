@@ -72,8 +72,12 @@ float current_sample[SAMPLES_PER_CYCLE], i_rms_cycle = 0, i_rms = 0, i_rms_cycle
 int pot_ativa_sample[SAMPLES_PER_CYCLE], pot_ativa_cycle = 0, pot_ativa = 0, pot_ativa_cycles_vector[ONE_SECOND];
 int pot_aparente = 0, pot_aparente_cycle = 0, pot_aparente_cycles_vector[SAMPLES_PER_CYCLE];
 int ready_values = 0;
-uint8_t data[128];
+
+uint8_t address[][6] = {"1Node", "2Node"};
+
+uint8_t data[32];
 uint16_t length;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -150,20 +154,23 @@ int main(void)
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
-  uint8_t address[][6] = {"1Node", "2Node"};
-
   NRF24_setDataRate(RF24_250KBPS);
+//  NRF24_setDataRate(RF24_1MBPS);
 
   NRF24_setPayloadSize(sizeof(data));
 
-  NRF24_setCRCLength(RF24_CRC_16);
+  NRF24_setCRCLength(RF24_CRC_8);
 
   NRF24_setAutoAck(true);
 
-  NRF24_openWritingPipe(address[0], sizeof(address[0]) - 1);
+  //NRF24_setChannel(69);
 
-  NRF24_openReadingPipe(1, address[1], sizeof(address[1]) - 1);
-  NRF24_openReadingPipe(2, address[0], sizeof(address[0]) - 1);
+  NRF24_setPALevel(RF24_PA_0dB);
+
+  NRF24_openWritingPipe(address[1], sizeof(address[1]) - 1);
+
+  NRF24_openReadingPipe(1, address[0], sizeof(address[0]) - 1);
+  NRF24_openReadingPipe(2, address[1], sizeof(address[1]) - 1);
 
   printRadioSettings();
 
@@ -202,8 +209,6 @@ int main(void)
     NRF24_stopListening();
     HAL_Delay(1000);
     report();
-
-
 /*
 
 */
@@ -658,13 +663,13 @@ void r_message(uint8_t *_data, int _data_len)
 void report()
 {
 	 unsigned long start_time = HAL_GetTick();
-	    bool reported = NRF24_write(&data, sizeof(data)); // transmit & save the report
+	    bool reported = NRF24_write(&data, sizeof(float)); // transmit & save the report
 	    unsigned long end_time = HAL_GetTick();
 
 	    if (reported)
 	    {
 	      printf("Transmission successful!"); // payload was delivered
-	      printf("Tranmission time %lu ms", end_time - start_time);
+	      printf("Tranmission time %lu ms\nSent: ", end_time - start_time);
 	      for (int i = 0; i < length; i++)
 	        {
 	          printf("%02X", data[i]);
