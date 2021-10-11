@@ -639,7 +639,7 @@ void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
   }
   printf("\n");
 
-  data[32] = (uint8_t)stream.bytes_written;
+  data[31] = (uint8_t)stream.bytes_written;
 }
 
 void r_message(uint8_t *_data, int _data_len)
