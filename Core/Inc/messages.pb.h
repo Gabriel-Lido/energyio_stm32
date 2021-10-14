@@ -10,42 +10,52 @@
 #endif
 
 /* Enum definitions */
-typedef enum _SensorType
-{
-    SensorType_WATER = 0,
-    SensorType_ENERGY = 1
+typedef enum _SensorType { 
+    SensorType_WATER = 0, 
+    SensorType_ENERGY = 1 
 } SensorType;
 
-typedef enum _DataType
-{
-    DataType_ANY_DATA = 0,
-    DataType_POWER_ACTIVE = 1,
-    DataType_POWER_APPARENT = 2,
-    DataType_CURRENT = 3,
-    DataType_VOLTAGE = 4,
-    DataType_FLOW = 5
+typedef enum _DataType { 
+    DataType_ANY_DATA = 0, 
+    DataType_POWER_ACTIVE = 1, 
+    DataType_POWER_APPARENT = 2, 
+    DataType_CURRENT = 3, 
+    DataType_VOLTAGE = 4, 
+    DataType_FLOW = 5 
 } DataType;
 
 /* Struct definitions */
 /* *
- Mensagem com dado de medição de um sensor 
+ Mensagem com dado de medição de um sensor de energia
 
- Rota associada `sensor/{serial}/data/report`
+ Rota associada `sensor/{serial_sensor}/energy/report`
  @param datetime {number} timestamp da hora da medição em formato UNIX
- @param data {number}  dado da medição */
-typedef struct _DataReport
-{
-    uint64_t datetime;
-    double data;
-    DataType type;
-} DataReport;
+ @param v_rms {number} valor de tensão rms
+ @param i_rms {number} valor de corrente rms
+ @param pot_ativa {number} potencia ativa registrada
+ @param pot_aparente {number} potencia aparente registrada */
+typedef struct _EnergyReport { 
+    uint64_t datetime; 
+    double v_rms; 
+    double i_rms; 
+    int32_t pot_ativa; 
+    int32_t pot_aparente; 
+} EnergyReport;
 
-typedef struct _EnergySensorReport
-{
-    double v_rms;
-    double i_rms;
-    int32_t pot_ativa;
-    int32_t pot_aparente;
+/* *
+ Mensagem com dado de medição de um sensor de energia 
+ Mensagem utilizada pelo sensor para report ao hub principal
+ @param v_rms {number} valor de tensão rms
+ @param i_rms {number} valor de corrente rms
+ @param pot_ativa {number} potencia ativa registrada
+ @param pot_aparente {number} potencia aparente registrada
+ @param samples {number} numero de amostars coletadas no periodo (1 amostra por segundo) */
+typedef struct _EnergySensorReport { 
+    double v_rms; 
+    double i_rms; 
+    int32_t pot_ativa; 
+    int32_t pot_aparente; 
+    int32_t samples; 
 } EnergySensorReport;
 
 /* *
@@ -53,133 +63,165 @@ typedef struct _EnergySensorReport
 
  @param secret {string} segredo para registrar um módulo
  @param mac_address {string} endereço MAC do Hub */
-typedef struct _HubRegister
-{
-    char secret[128];
-    char mac_address[128];
+typedef struct _HubRegister { 
+    char secret[128]; 
+    char mac_address[128]; 
 } HubRegister;
 
 /* *
  Mensagem para registrar um módulo de Sensor
 
- Rota associada `hub/{serial}/sensor/register`
+ Rota associada `hub/{serial_hub}/sensor/register`
  @param type {SensorType} tipo do sensor
  @param number {number} número associado ao sensor
- @param serial {string} serial identificador */
-typedef struct _SensorRegister
-{
-    SensorType type;
-    int32_t number;
-    char serial[128];
+ @param sensor_serial {string} serial identificador */
+typedef struct _SensorRegister { 
+    SensorType type; 
+    int32_t number; 
+    char sensor_serial[128]; 
 } SensorRegister;
+
+/* *
+ Mensagem com dado de medição de um sensor de aguá
+
+ Rota associada `sensor/{serial_sensor}/water/report`
+ @param datetime {number} timestamp da hora da medição em formato UNIX
+ @param samples {number} numero de amostras coletadas em 1 segundo
+ @param instant {number} valor do fluxo de aguá instanteneo em mL */
+typedef struct _WaterReport { 
+    uint64_t datetime; 
+    int32_t samples; 
+    double instant; 
+} WaterReport;
+
+/* *
+ Mensagem com dado de medição de um sensor de aguá 
+ Mensagem utilizada pelo sensor para report ao hub principal
+ @param samples {number} numero de amostras coletadas em 1 segundo
+ @param instant {number} valor do fluxo de aguá instanteneo em mL */
+typedef struct _WaterSensorReport { 
+    int32_t samples; 
+    double instant; 
+} WaterSensorReport;
+
 
 /* Helper constants for enums */
 #define _SensorType_MIN SensorType_WATER
 #define _SensorType_MAX SensorType_ENERGY
-#define _SensorType_ARRAYSIZE ((SensorType)(SensorType_ENERGY + 1))
+#define _SensorType_ARRAYSIZE ((SensorType)(SensorType_ENERGY+1))
 
 #define _DataType_MIN DataType_ANY_DATA
 #define _DataType_MAX DataType_FLOW
-#define _DataType_ARRAYSIZE ((DataType)(DataType_FLOW + 1))
+#define _DataType_ARRAYSIZE ((DataType)(DataType_FLOW+1))
+
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define EnergySensorReport_init_default \
-    {                                   \
-        0, 0, 0, 0                      \
-    }
-#define DataReport_init_default \
-    {                           \
-        0, 0, _DataType_MIN     \
-    }
-#define SensorRegister_init_default \
-    {                               \
-        _SensorType_MIN, 0, ""      \
-    }
-#define HubRegister_init_default \
-    {                            \
-        "", ""                   \
-    }
-#define EnergySensorReport_init_zero \
-    {                                \
-        0, 0, 0, 0                   \
-    }
-#define DataReport_init_zero \
-    {                        \
-        0, 0, _DataType_MIN  \
-    }
-#define SensorRegister_init_zero \
-    {                            \
-        _SensorType_MIN, 0, ""   \
-    }
-#define HubRegister_init_zero \
-    {                         \
-        "", ""                \
-    }
+#define WaterSensorReport_init_default           {0, 0}
+#define EnergySensorReport_init_default          {0, 0, 0, 0, 0}
+#define EnergyReport_init_default                {0, 0, 0, 0, 0}
+#define WaterReport_init_default                 {0, 0, 0}
+#define SensorRegister_init_default              {_SensorType_MIN, 0, ""}
+#define HubRegister_init_default                 {"", ""}
+#define WaterSensorReport_init_zero              {0, 0}
+#define EnergySensorReport_init_zero             {0, 0, 0, 0, 0}
+#define EnergyReport_init_zero                   {0, 0, 0, 0, 0}
+#define WaterReport_init_zero                    {0, 0, 0}
+#define SensorRegister_init_zero                 {_SensorType_MIN, 0, ""}
+#define HubRegister_init_zero                    {"", ""}
 
 /* Field tags (for use in manual encoding/decoding) */
-#define DataReport_datetime_tag 1
-#define DataReport_data_tag 2
-#define DataReport_type_tag 3
-#define EnergySensorReport_v_rms_tag 1
-#define EnergySensorReport_i_rms_tag 2
-#define EnergySensorReport_pot_ativa_tag 3
-#define EnergySensorReport_pot_aparente_tag 4
-#define HubRegister_secret_tag 1
-#define HubRegister_mac_address_tag 2
-#define SensorRegister_type_tag 1
-#define SensorRegister_number_tag 2
-#define SensorRegister_serial_tag 3
+#define EnergyReport_datetime_tag                1
+#define EnergyReport_v_rms_tag                   2
+#define EnergyReport_i_rms_tag                   3
+#define EnergyReport_pot_ativa_tag               4
+#define EnergyReport_pot_aparente_tag            5
+#define EnergySensorReport_v_rms_tag             1
+#define EnergySensorReport_i_rms_tag             2
+#define EnergySensorReport_pot_ativa_tag         3
+#define EnergySensorReport_pot_aparente_tag      4
+#define EnergySensorReport_samples_tag           5
+#define HubRegister_secret_tag                   1
+#define HubRegister_mac_address_tag              2
+#define SensorRegister_type_tag                  1
+#define SensorRegister_number_tag                2
+#define SensorRegister_sensor_serial_tag         3
+#define WaterReport_datetime_tag                 1
+#define WaterReport_samples_tag                  2
+#define WaterReport_instant_tag                  3
+#define WaterSensorReport_samples_tag            1
+#define WaterSensorReport_instant_tag            2
 
 /* Struct field encoding specification for nanopb */
-#define EnergySensorReport_FIELDLIST(X, a)      \
-    X(a, STATIC, SINGULAR, DOUBLE, v_rms, 1)    \
-    X(a, STATIC, SINGULAR, DOUBLE, i_rms, 2)    \
-    X(a, STATIC, SINGULAR, INT32, pot_ativa, 3) \
-    X(a, STATIC, SINGULAR, INT32, pot_aparente, 4)
+#define WaterSensorReport_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, INT32,    samples,           1) \
+X(a, STATIC,   SINGULAR, DOUBLE,   instant,           2)
+#define WaterSensorReport_CALLBACK NULL
+#define WaterSensorReport_DEFAULT NULL
+
+#define EnergySensorReport_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, DOUBLE,   v_rms,             1) \
+X(a, STATIC,   SINGULAR, DOUBLE,   i_rms,             2) \
+X(a, STATIC,   SINGULAR, INT32,    pot_ativa,         3) \
+X(a, STATIC,   SINGULAR, INT32,    pot_aparente,      4) \
+X(a, STATIC,   SINGULAR, INT32,    samples,           5)
 #define EnergySensorReport_CALLBACK NULL
 #define EnergySensorReport_DEFAULT NULL
 
-#define DataReport_FIELDLIST(X, a)              \
-    X(a, STATIC, SINGULAR, UINT64, datetime, 1) \
-    X(a, STATIC, SINGULAR, DOUBLE, data, 2)     \
-    X(a, STATIC, SINGULAR, UENUM, type, 3)
-#define DataReport_CALLBACK NULL
-#define DataReport_DEFAULT NULL
+#define EnergyReport_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT64,   datetime,          1) \
+X(a, STATIC,   SINGULAR, DOUBLE,   v_rms,             2) \
+X(a, STATIC,   SINGULAR, DOUBLE,   i_rms,             3) \
+X(a, STATIC,   SINGULAR, INT32,    pot_ativa,         4) \
+X(a, STATIC,   SINGULAR, INT32,    pot_aparente,      5)
+#define EnergyReport_CALLBACK NULL
+#define EnergyReport_DEFAULT NULL
 
-#define SensorRegister_FIELDLIST(X, a)       \
-    X(a, STATIC, SINGULAR, UENUM, type, 1)   \
-    X(a, STATIC, SINGULAR, INT32, number, 2) \
-    X(a, STATIC, SINGULAR, STRING, serial, 3)
+#define WaterReport_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT64,   datetime,          1) \
+X(a, STATIC,   SINGULAR, INT32,    samples,           2) \
+X(a, STATIC,   SINGULAR, DOUBLE,   instant,           3)
+#define WaterReport_CALLBACK NULL
+#define WaterReport_DEFAULT NULL
+
+#define SensorRegister_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UENUM,    type,              1) \
+X(a, STATIC,   SINGULAR, INT32,    number,            2) \
+X(a, STATIC,   SINGULAR, STRING,   sensor_serial,     3)
 #define SensorRegister_CALLBACK NULL
 #define SensorRegister_DEFAULT NULL
 
-#define HubRegister_FIELDLIST(X, a)           \
-    X(a, STATIC, SINGULAR, STRING, secret, 1) \
-    X(a, STATIC, SINGULAR, STRING, mac_address, 2)
+#define HubRegister_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, STRING,   secret,            1) \
+X(a, STATIC,   SINGULAR, STRING,   mac_address,       2)
 #define HubRegister_CALLBACK NULL
 #define HubRegister_DEFAULT NULL
 
-    extern const pb_msgdesc_t EnergySensorReport_msg;
-    extern const pb_msgdesc_t DataReport_msg;
-    extern const pb_msgdesc_t SensorRegister_msg;
-    extern const pb_msgdesc_t HubRegister_msg;
+extern const pb_msgdesc_t WaterSensorReport_msg;
+extern const pb_msgdesc_t EnergySensorReport_msg;
+extern const pb_msgdesc_t EnergyReport_msg;
+extern const pb_msgdesc_t WaterReport_msg;
+extern const pb_msgdesc_t SensorRegister_msg;
+extern const pb_msgdesc_t HubRegister_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
+#define WaterSensorReport_fields &WaterSensorReport_msg
 #define EnergySensorReport_fields &EnergySensorReport_msg
-#define DataReport_fields &DataReport_msg
+#define EnergyReport_fields &EnergyReport_msg
+#define WaterReport_fields &WaterReport_msg
 #define SensorRegister_fields &SensorRegister_msg
 #define HubRegister_fields &HubRegister_msg
 
 /* Maximum encoded size of messages (where known) */
-#define DataReport_size 22
-#define EnergySensorReport_size 40
-#define HubRegister_size 260
-#define SensorRegister_size 143
+#define EnergyReport_size                        51
+#define EnergySensorReport_size                  51
+#define HubRegister_size                         260
+#define SensorRegister_size                      143
+#define WaterReport_size                         31
+#define WaterSensorReport_size                   20
 
 #ifdef __cplusplus
 } /* extern "C" */

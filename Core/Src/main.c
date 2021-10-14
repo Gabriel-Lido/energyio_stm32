@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -73,11 +73,13 @@ int pot_ativa_sample[SAMPLES_PER_CYCLE], pot_ativa_cycle = 0, pot_ativa = 0, pot
 int pot_aparente = 0, pot_aparente_cycle = 0, pot_aparente_cycles_vector[SAMPLES_PER_CYCLE];
 int ready_values = 0;
 
+float aux_v_rms, aux_i_rms = 0;
+int aux_pot_ativa, aux_pot_aparente, samples = 0;
+
 uint8_t address[][6] = {"1Node", "2Node"};
 
 uint8_t data[32];
 uint8_t length;
-bool reported = false;
 
 /* USER CODE END PV */
 
@@ -89,6 +91,7 @@ static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_SPI1_Init(void);
+static bool nrf_report();
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -105,9 +108,9 @@ int _write(int file, char *ptr, int len)
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -182,18 +185,49 @@ int main(void)
     if (ready_values)
     {
       printf("Tensao: %.1f  Corrente:%.3f  "
-             "Pot.Ativa:%d  Pot Aparente:%d\r\n",
-             v_rms, i_rms, pot_ativa, pot_aparente);
-      w_message(v_rms, i_rms, pot_ativa, pot_aparente);
-      while(reported != true)
-      {nrf_report();}
-      reported = false;
+             "Pot.Ativa:%d  Pot Aparente:%d Msgs acumuladas:%d\r\n",
+             v_rms, i_rms, pot_ativa, pot_aparente, samples);
+      if (samples == 0)
+        w_message(v_rms, i_rms, pot_ativa, pot_aparente, samples);
+      else
+        w_message(aux_v_rms, aux_i_rms, aux_pot_ativa, aux_pot_aparente, samples);
+
+      unsigned long start = HAL_GetTick();
+      bool aux = false;
+      while (aux == false && (unsigned long)(HAL_GetTick()) - start <= 500)
+      {
+        if (nrf_report())
+        {
+          aux_v_rms = 0;
+          aux_i_rms = 0;
+          aux_pot_aparente = 0;
+          aux_pot_ativa = 0;
+          samples = 0;
+          aux = true;
+        }
+      }
+      if ((unsigned long)(HAL_GetTick()) - start > 500)
+      {
+        printf("\n[TX] Timeout\n");
+        aux_v_rms += v_rms;
+        aux_i_rms += i_rms;
+        aux_pot_aparente += pot_aparente;
+        aux_pot_ativa += pot_ativa;
+        samples++;
+//        printf("Tensao: %.1f  Corrente:%.3f  "
+//               "Pot.Ativa:%d  Pot Aparente:%d Numero de amostras:%d\r\n",
+//               aux_v_rms, aux_i_rms, aux_pot_ativa, aux_pot_aparente, samples);
+      }
+
+      //      while(reported != true)
+      //      {nrf_report();}
+
       ready_values = 0;
     }
 
     HAL_Delay(10);
 
-    //r_message(data, sizeof(data));
+    // r_message(data, sizeof(data));
 
     //    NRF24_startListening();
     //    HAL_Delay(1000);
@@ -202,7 +236,6 @@ int main(void)
     //    HAL_Delay(1000);
 
     //    printf("payload size %d", NRF24_getPayloadSize());
-
 
     /*
 
@@ -216,9 +249,9 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -226,8 +259,8 @@ void SystemClock_Config(void)
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
@@ -240,7 +273,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   /** Initializes the CPU, AHB and APB buses clocks
-  */
+   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
@@ -260,10 +293,10 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_ADC1_Init(void)
 {
 
@@ -277,7 +310,7 @@ static void MX_ADC1_Init(void)
 
   /* USER CODE END ADC1_Init 1 */
   /** Common config
-  */
+   */
   hadc1.Instance = ADC1;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
@@ -290,7 +323,7 @@ static void MX_ADC1_Init(void)
     Error_Handler();
   }
   /** Configure Regular Channel
-  */
+   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
@@ -304,10 +337,10 @@ static void MX_ADC1_Init(void)
 }
 
 /**
-  * @brief ADC2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief ADC2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_ADC2_Init(void)
 {
 
@@ -321,7 +354,7 @@ static void MX_ADC2_Init(void)
 
   /* USER CODE END ADC2_Init 1 */
   /** Common config
-  */
+   */
   hadc2.Instance = ADC2;
   hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc2.Init.ContinuousConvMode = DISABLE;
@@ -334,7 +367,7 @@ static void MX_ADC2_Init(void)
     Error_Handler();
   }
   /** Configure Regular Channel
-  */
+   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
@@ -348,10 +381,10 @@ static void MX_ADC2_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief SPI1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_SPI1_Init(void)
 {
 
@@ -385,10 +418,10 @@ static void MX_SPI1_Init(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief TIM2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_TIM2_Init(void)
 {
 
@@ -429,10 +462,10 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief USART1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_USART1_UART_Init(void)
 {
 
@@ -461,10 +494,10 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -597,7 +630,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 unsigned long last_micros;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  unsigned long debouncing_time = 200; //Debouncing Time in Milliseconds
+  unsigned long debouncing_time = 200; // Debouncing Time in Milliseconds
   if (GPIO_Pin == SW1_Pin)
   {
     if ((HAL_GetTick() - last_micros >= debouncing_time))
@@ -618,7 +651,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
-void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
+void w_message(double v_rms, double i_rms, int pot_at, int pot_ap, int samples)
 {
   uint8_t buffer[32];
   EnergySensorReport msg = EnergySensorReport_init_zero;
@@ -629,6 +662,7 @@ void w_message(double v_rms, double i_rms, int pot_at, int pot_ap)
   msg.i_rms = i_rms;
   msg.pot_aparente = pot_ap;
   msg.pot_ativa = pot_at;
+  msg.samples = samples;
   pb_encode(&stream, EnergySensorReport_fields, &msg);
 
   printf("MSG SERIALIZED : ");
@@ -655,10 +689,10 @@ void r_message(uint8_t *_data, int _data_len)
   // this->user = msg.user;
 }
 
-void nrf_report()
+bool nrf_report()
 {
   unsigned long start_time = HAL_GetTick();
-  reported = NRF24_write(&data, sizeof(data)); // transmit & save the report
+  bool reported = NRF24_write(&data, sizeof(data)); // transmit & save the report
   unsigned long end_time = HAL_GetTick();
 
   if (reported)
@@ -671,6 +705,7 @@ void nrf_report()
     }
     printf("\n");
   }
+  return reported;
 }
 
 void nrf_listen()
@@ -693,9 +728,9 @@ void nrf_listen()
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -709,12 +744,12 @@ void Error_Handler(void)
 
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
