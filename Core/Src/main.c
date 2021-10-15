@@ -27,7 +27,7 @@
 #include "math.h"
 #include "float.h"
 #include "nrf24.h"
-#include "messages.pb.h"
+#include "messages_stm.pb.h"
 #include "pb.h"
 #include "pb_encode.h"
 #include "pb_decode.h"
@@ -76,8 +76,8 @@ int ready_values = 0;
 float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
-uint8_t address[][6] = {"1Node", "2Node"};
-
+uint8_t node_address[2][6] = {"Hub00", "Node1"};
+bool pairingMode = false;
 uint8_t data[32];
 uint8_t length;
 
@@ -92,6 +92,8 @@ static void MX_TIM2_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_SPI1_Init(void);
 static bool nrf_report();
+static bool nrf_pairing();
+static bool nrf_pairing_report(char *_serial, int _channel);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -158,10 +160,10 @@ int main(void)
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
-  NRF24_openWritingPipe(address[1], sizeof(address[1]) - 1);
+  NRF24_openWritingPipe(node_address[1], sizeof(node_address[1]) - 1);
 
-  NRF24_openReadingPipe(1, address[0], sizeof(address[0]) - 1);
-  //  NRF24_openReadingPipe(2, address[1], sizeof(address[1]) - 1);
+  NRF24_openReadingPipe(1, node_address[0], sizeof(node_address[0]) - 1);
+  //  NRF24_openReadingPipe(2, node_address[1], sizeof(node_address[1]) - 1);
 
   NRF24_stopListening();
 
@@ -175,6 +177,50 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if (pairingMode)
+    {
+      NRF24_startListening();
+      HAL_Delay(500);
+      unsigned long start = HAL_GetTick();
+      bool aux = false;
+      while (aux != true && (unsigned long)(HAL_GetTick()) - start <= 15000)
+      {
+        if (nrf_pairing())
+        {
+        	printf("\n\n[PAIRING] report");
+        	nrf_pairing_report("NODE1", 69);
+          aux = true;
+        }
+        HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
+        HAL_Delay(50);
+      }
+      if ((unsigned long)(HAL_GetTick()) - start > 15000)
+      {
+        printf("\n\n[PAIRING] Timeout\n\n");
+      }
+
+      NRF24_stopListening();
+      HAL_Delay(500);
+      start = HAL_GetTick();
+      while (aux == true && (unsigned long)(HAL_GetTick()) - start <= 15000)
+      {
+        if (nrf_report())
+        {
+          aux = false;
+          printf("\n\n[PAIRING] Success\n\n");
+        }
+        HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
+        HAL_Delay(250);
+      }
+      if ((unsigned long)(HAL_GetTick()) - start > 15000)
+      {
+        printf("\n\n[PAIRING] Timeout\n\n");
+      }
+
+      pairingMode = false;
+      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
+    }
+
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
     if (v_rms <= 20)
@@ -204,6 +250,7 @@ int main(void)
           aux_pot_ativa = 0;
           samples = 0;
           aux = true;
+          HAL_GPIO_TogglePin(LED_1_GPIO_Port, LED_1_Pin);
         }
       }
       if ((unsigned long)(HAL_GetTick()) - start > 500)
@@ -214,14 +261,7 @@ int main(void)
         aux_pot_aparente += pot_aparente;
         aux_pot_ativa += pot_ativa;
         samples++;
-//        printf("Tensao: %.1f  Corrente:%.3f  "
-//               "Pot.Ativa:%d  Pot Aparente:%d Numero de amostras:%d\r\n",
-//               aux_v_rms, aux_i_rms, aux_pot_ativa, aux_pot_aparente, samples);
       }
-
-      //      while(reported != true)
-      //      {nrf_report();}
-
       ready_values = 0;
     }
 
@@ -636,7 +676,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     if ((HAL_GetTick() - last_micros >= debouncing_time))
     {
       printf("\n\n\nSW1\n\n\n");
-      HAL_GPIO_TogglePin(LED_1_GPIO_Port, LED_1_Pin);
       last_micros = HAL_GetTick();
     }
   }
@@ -644,8 +683,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   {
     if ((HAL_GetTick() - last_micros >= debouncing_time))
     {
-      printf("\n\n\nSW2\n\n\n");
-      HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
+      printf("\n\n\nPAIRING MODE ON\n\n\n");
+      pairingMode = true;
       last_micros = HAL_GetTick();
     }
   }
@@ -676,19 +715,6 @@ void w_message(double v_rms, double i_rms, int pot_at, int pot_ap, int samples)
   data[31] = (uint8_t)stream.bytes_written;
 }
 
-void r_message(uint8_t *_data, int _data_len)
-{
-  EnergySensorReport msg = EnergySensorReport_init_zero;
-  pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
-  pb_decode(&stream, EnergySensorReport_fields, &msg);
-
-  printf("DECODED: Tensao: %.1f  Corrente:%.3f  "
-         "Pot.Ativa:%d  Pot Aparente:%d\r\n",
-         msg.v_rms, msg.i_rms, msg.pot_ativa, msg.pot_aparente);
-
-  // this->user = msg.user;
-}
-
 bool nrf_report()
 {
   unsigned long start_time = HAL_GetTick();
@@ -708,7 +734,29 @@ bool nrf_report()
   return reported;
 }
 
-void nrf_listen()
+bool nrf_pairing_report(char *_serial, int _channel)
+{
+  uint8_t buffer[32];
+  PairingMessage msg = PairingMessage_init_zero;
+
+  pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+
+  strcpy(msg.serial, _serial);
+  msg.channel = _channel;
+  pb_encode(&stream, PairingMessage_fields, &msg);
+
+  printf("\nPairing Msg : ");
+  for (int i = 0; i < stream.bytes_written; i++)
+  {
+    data[i] = buffer[i];
+    printf("%02X", data[i]);
+  }
+  printf("\n");
+
+  data[31] = (uint8_t)stream.bytes_written;
+}
+
+bool nrf_pairing()
 {
   uint8_t pipe;
   if (NRF24_availablePipe(&pipe))
@@ -722,7 +770,21 @@ void nrf_listen()
       printf("%02X", data[i]);
     }
     printf("\n");
+    printf("\n");
+    r_PairingMessage(data, bytes);
+    printf("\n");
+    return true;
   }
+  return false;
+}
+
+void r_PairingMessage(uint8_t *_data, int _data_len)
+{
+  PairingMessage msg = PairingMessage_init_zero;
+  pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
+  pb_decode(&stream, PairingMessage_fields, &msg);
+
+  printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, msg.channel);
 }
 
 /* USER CODE END 4 */
