@@ -32,6 +32,7 @@
 #include "pb_encode.h"
 #include "pb_decode.h"
 #include "pb_common.h"
+#include "flash_f1.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,6 +49,8 @@
 #define SAMPLES_PER_CYCLE 128
 #define ONE_SECOND 60
 #define HALF_SECOND 30
+
+#define FLASH_PAGE_ADDR 0x0801FC00
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -93,9 +96,10 @@ static void MX_ADC2_Init(void);
 static void MX_SPI1_Init(void);
 static bool nrf_report();
 static bool nrf_pairing();
-static bool nrf_pairing_report(char *_serial, int _channel);
+static void nrf_pairing_report(char *_serial, int _channel);
 /* USER CODE BEGIN PFP */
-
+void r_PairingMessage(uint8_t *_data, int _data_len);
+void w_message(double v_rms, double i_rms, int pot_at, int pot_ap, int samples);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -116,7 +120,9 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	/*Buffers flash*/
+//	uint8_t buff_write_flash[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+//	uint8_t buff_read_flash[16];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -170,6 +176,10 @@ int main(void)
   printRadioSettings();
 
   printf("END SETUP\n\n");
+
+  /* Operações Flash*/
+//  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
+//  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_read_flash, (sizeof(buff_write_flash)/sizeof(int)));
 
   /* USER CODE END 2 */
 
@@ -597,7 +607,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 
   int count;
-  static teste_ini = 0;
+//  static teste_ini = 0;
 
   actual_tick[actual_sample] = HAL_GetTick();
 
@@ -734,7 +744,7 @@ bool nrf_report()
   return reported;
 }
 
-bool nrf_pairing_report(char *_serial, int _channel)
+void nrf_pairing_report(char *_serial, int _channel)
 {
   uint8_t buffer[32];
   PairingMessage msg = PairingMessage_init_zero;
@@ -784,7 +794,7 @@ void r_PairingMessage(uint8_t *_data, int _data_len)
   pb_istream_t stream = pb_istream_from_buffer(_data, _data_len);
   pb_decode(&stream, PairingMessage_fields, &msg);
 
-  printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, msg.channel);
+  printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, (int)msg.channel);
 }
 
 /* USER CODE END 4 */
