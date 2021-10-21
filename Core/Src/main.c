@@ -181,8 +181,7 @@ int main(void)
   /* Operações Flash*/
 //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
   Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)node_address[0], (sizeof(node_address[0])/sizeof(int)));
-  for(int i=0; i<5; i++)
-	  printf("%d",node_address[0][i]);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
