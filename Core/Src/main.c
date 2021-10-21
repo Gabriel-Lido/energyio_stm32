@@ -79,7 +79,8 @@ int ready_values = 0;
 float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
-uint8_t node_address[2][6] = {"Hub00", "Node1"};
+uint8_t node_address[2][6] = {"HUB01", "EA101"};
+char sensor_serial[6] = "EA101";
 bool pairingMode = false;
 uint8_t data[32];
 uint8_t length;
@@ -179,8 +180,9 @@ int main(void)
 
   /* Operações Flash*/
 //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
-//  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_read_flash, (sizeof(buff_write_flash)/sizeof(int)));
-
+  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)node_address[0], (sizeof(node_address[0])/sizeof(int)));
+  for(int i=0; i<5; i++)
+	  printf("%d",node_address[0][i]);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -198,7 +200,7 @@ int main(void)
         if (nrf_pairing())
         {
         	printf("\n\n[PAIRING] report");
-        	nrf_pairing_report("NODE1", 69);
+        	nrf_pairing_report(sensor_serial, 69);
           aux = true;
         }
         HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
@@ -795,6 +797,8 @@ void r_PairingMessage(uint8_t *_data, int _data_len)
   pb_decode(&stream, PairingMessage_fields, &msg);
 
   printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, (int)msg.channel);
+
+  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)msg.serial, (sizeof(msg.serial)/sizeof(int)));
 }
 
 /* USER CODE END 4 */
