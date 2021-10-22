@@ -79,7 +79,9 @@ int ready_values = 0;
 float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
-uint8_t node_address[3][6] = {"HUB01", "EA101", "12345"};
+uint8_t master_address[6] = {"HUB01"};
+uint8_t sensor_address[6] = {"0NODE"};
+uint8_t pairing_address[6] = {"1NODE"};
 char sensor_serial[6] = "EA101";
 bool pairingMode = false;
 uint8_t data[32];
@@ -167,13 +169,13 @@ int main(void)
 
   /* Operações Flash*/
   //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
-  //  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)node_address[0], (sizeof(node_address[0])/sizeof(int)));
+    Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)sensor_address, (sizeof(sensor_address)/sizeof(int)));
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
-  NRF24_openWritingPipe(node_address[1], sizeof(node_address[1]) - 1);
+  NRF24_openWritingPipe(sensor_address, sizeof(sensor_address) - 1);
 
-  NRF24_openReadingPipe(1, node_address[0], sizeof(node_address[0]) - 1);
+  NRF24_openReadingPipe(1, master_address, sizeof(master_address) - 1);
   //  NRF24_openReadingPipe(2, node_address[1], sizeof(node_address[1]) - 1);
 
   NRF24_stopListening();
@@ -210,7 +212,7 @@ int main(void)
         printf("\n\n[PAIRING] Timeout\n\n");
       }
       NRF24_stopListening();
-      NRF24_openWritingPipe(node_address[2], sizeof(node_address[2]) - 1);
+      NRF24_openWritingPipe(pairing_address, sizeof(pairing_address) - 1);
       HAL_Delay(1500);
       NRF24_stopListening();
       start = HAL_GetTick();
@@ -232,7 +234,7 @@ int main(void)
       pairingMode = false;
       HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
       NRF24_stopListening();
-      NRF24_openWritingPipe(node_address[1], sizeof(node_address[1]) - 1);
+      NRF24_openWritingPipe(sensor_address, sizeof(sensor_address) - 1);
       HAL_Delay(1500);
       NRF24_stopListening();
     }
@@ -691,7 +693,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   {
     if ((HAL_GetTick() - last_micros >= debouncing_time))
     {
-      printf("\n\n\nSW1\n\n\n");
+      printf("\n\n\nRESET\n\n\n");
+      sensor_address[0] = "00000";
+      Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)sensor_address, (sizeof(sensor_address)/sizeof(int)));
       last_micros = HAL_GetTick();
     }
   }
@@ -801,8 +805,9 @@ void r_PairingMessage(uint8_t *_data, int _data_len)
   pb_decode(&stream, PairingMessage_fields, &msg);
 
   printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, (int)msg.channel);
-
-  // Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)msg.serial, (sizeof(msg.serial)/sizeof(int)));
+  for(int i = 0; i<6;i++)
+	  sensor_address[i] = (uint8_t)msg.serial[i];
+  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)sensor_address, (sizeof(sensor_address)/sizeof(int)));
 }
 
 /* USER CODE END 4 */
