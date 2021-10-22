@@ -79,7 +79,7 @@ int ready_values = 0;
 float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
-uint8_t node_address[3][6] = {"HUB01", "EA101", "NODE1"};
+uint8_t node_address[3][6] = {"HUB01", "EA101", "12345"};
 char sensor_serial[6] = "EA101";
 bool pairingMode = false;
 uint8_t data[32];
@@ -121,9 +121,9 @@ int _write(int file, char *ptr, int len)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	/*Buffers flash*/
-//	uint8_t buff_write_flash[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-//	uint8_t buff_read_flash[16];
+  /*Buffers flash*/
+  //	uint8_t buff_write_flash[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+  //	uint8_t buff_read_flash[16];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -166,8 +166,8 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim2);
 
   /* Operações Flash*/
- //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
- //  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)node_address[0], (sizeof(node_address[0])/sizeof(int)));
+  //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
+  //  Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)node_address[0], (sizeof(node_address[0])/sizeof(int)));
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
@@ -181,7 +181,6 @@ int main(void)
   printRadioSettings();
 
   printf("END SETUP\n\n");
-
 
   /* USER CODE END 2 */
 
@@ -199,8 +198,8 @@ int main(void)
       {
         if (nrf_pairing())
         {
-        	printf("\n\n[PAIRING] report");
-        	nrf_pairing_report(sensor_serial, 69);
+          printf("\n\n[PAIRING] report");
+          nrf_pairing_report(sensor_serial, 69);
           aux = true;
         }
         HAL_GPIO_TogglePin(LED_2_GPIO_Port, LED_2_Pin);
@@ -230,13 +229,13 @@ int main(void)
         printf("\n\n[PAIRING] Timeout\n\n");
       }
 
-			pairingMode = false;
-			HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
-			NRF24_stopListening();
-			      NRF24_openWritingPipe(node_address[1], sizeof(node_address[1]) - 1);
-			      HAL_Delay(1500);
-			      NRF24_stopListening();
-		}
+      pairingMode = false;
+      HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, GPIO_PIN_SET);
+      NRF24_stopListening();
+      NRF24_openWritingPipe(node_address[1], sizeof(node_address[1]) - 1);
+      HAL_Delay(1500);
+      NRF24_stopListening();
+    }
 
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
@@ -614,7 +613,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 
   int count;
-//  static teste_ini = 0;
+  //  static teste_ini = 0;
 
   actual_tick[actual_sample] = HAL_GetTick();
 
@@ -803,7 +802,7 @@ void r_PairingMessage(uint8_t *_data, int _data_len)
 
   printf("DECODED: Serial: %s  Channel: %d\r\n", msg.serial, (int)msg.channel);
 
-  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)msg.serial, (sizeof(msg.serial)/sizeof(int)));
+  // Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)msg.serial, (sizeof(msg.serial)/sizeof(int)));
 }
 
 /* USER CODE END 4 */
