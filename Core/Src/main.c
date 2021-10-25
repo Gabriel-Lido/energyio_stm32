@@ -43,8 +43,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define ZERO_OFFSET_V 2080
-#define ZERO_OFFSET_I 2088
-#define ADC_TO_V_STEP 0.2030
+//#define ZERO_OFFSET_I 2088
+#define ZERO_OFFSET_I 2135
+#define ADC_TO_V_STEP 0.2022
 #define ADC_TO_I_STEP 0.0113
 #define SAMPLES_PER_CYCLE 128
 #define ONE_SECOND 60
@@ -80,9 +81,9 @@ float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
 uint8_t master_address[6] = {"HUB01"};
-uint8_t sensor_address[6] = {"0NODE"};
+uint8_t sensor_address[6] = {"5NODE"};
 uint8_t pairing_address[6] = {"1NODE"};
-char sensor_serial[6] = "EA101";
+char sensor_serial[6] = "EA123";
 bool pairingMode = false;
 uint8_t data[32];
 uint8_t length;
@@ -101,6 +102,7 @@ static bool nrf_report();
 static bool nrf_pairing();
 static void nrf_pairing_report(char *_serial, int _channel);
 /* USER CODE BEGIN PFP */
+void verify_offset();
 void r_PairingMessage(uint8_t *_data, int _data_len);
 void w_message(double v_rms, double i_rms, int pot_at, int pot_ap, int samples);
 /* USER CODE END PFP */
@@ -169,7 +171,7 @@ int main(void)
 
   /* Operações Flash*/
   //  Flash_Write_Data(FLASH_PAGE_ADDR , (uint32_t*)buff_write_flash, (sizeof(buff_write_flash)/sizeof(int)));
-    Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)sensor_address, (sizeof(sensor_address)/sizeof(int)));
+//    Flash_Read_Data(FLASH_PAGE_ADDR , (uint32_t*)sensor_address, (sizeof(sensor_address)/sizeof(int)));
 
   NRF24_begin(GPIOB, NRF_CSN_Pin, NRF_CE_Pin, hspi1);
 
@@ -241,10 +243,7 @@ int main(void)
 
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-    if (v_rms <= 20)
-      v_rms = 0;
-    if (i_rms < 0.14)
-      i_rms = 0;
+    verify_offset();
 
     if (ready_values)
     {
@@ -679,6 +678,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /*ADC Tensao*/
   HAL_ADC_Start_IT(&hadc2);
+}
+
+void verify_offset(){
+
+    if (v_rms <= 20) {
+    	v_rms = 0; pot_ativa = 0; pot_aparente = 0;
+    }
+    if (i_rms < 0.14) {
+    	i_rms = 0; pot_ativa = 0; pot_aparente = 0;
+    }
+
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
