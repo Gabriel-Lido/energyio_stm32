@@ -81,9 +81,9 @@ float aux_v_rms, aux_i_rms = 0;
 int aux_pot_ativa, aux_pot_aparente, samples = 0;
 
 uint8_t master_address[6] = {"HUB01"};
-uint8_t sensor_address[6] = {"5NODE"};
+uint8_t sensor_address[6] = {"0NODE"};
 uint8_t pairing_address[6] = {"1NODE"};
-char sensor_serial[6] = "EA123";
+char sensor_serial[6] = "EA101";
 bool pairingMode = false;
 uint8_t data[32];
 uint8_t length;
